@@ -359,6 +359,97 @@ def getGeneralAtariRamFitness(individual, timesToRepeat=10, envName=None,
     # finished and returned a result:
     return list(allScores)
 
+def getMountainCarFitness_modifiedReward(individual, timesToRepeat, renderSpeed=None, continuous=False, numThreads=10):
+    """Handle calling the modified-reward mountain car fitness function in
+    a multithreaded manner. A modified-reward version is provided because the
+    standard environment doesn't reward partial progress towards the goal.
+
+    Parameters:
+      individual - The model to be tested.
+      timesToRepeat - The number of fitnesses to return.
+      renderSpeed - If None, don't render. Otherwise the number of seconds
+                    to pause between each frame's rendering.
+      continuous - True if we should use MountainCarContinuous, false to use
+                   MountainCar.
+      numThreads - Number of threads/processes to use."""
+
+    # Build a list of times to repeat to make zipping easier:
+    repeats = [i for i in range(timesToRepeat)]
+
+    # Allocate our process pool:
+    pool = Pool(numThreads)
+
+    # Send in the arguments expected by the single-run fitness function:
+    allScores = pool.map(getOneRunMountainCarFitness_modifiedReward,
+                         zip(itertools.repeat(individual),
+                             itertools.repeat(continuous),
+                             itertools.repeat(renderSpeed),
+                             repeats))
+
+    # Requesting the list will cause this line to block until all threads have
+    # returned their results:
+    return list(allScores)
+
+def getOneRunMountainCarFitness_modifiedReward(tup):
+    """Get one fitness from the MountainCar or MountainCarContinuous
+    environment while modifying its reward function.
+
+    The MountainCar environments reward only success, not progress towards
+    success.  This means that individuals that are trying to drive up the
+    hill, but not succeeding will get the exact same fitness as individuals
+    that do nothing at all. This function provides some reward to the
+    individual based on the maximum distance it made it up the hill.
+
+    Parameters: A tuple expected to contain the following:
+      0: individual - The model,
+      1: continuous - True if using MountainCarContinuous, false to use
+                      MountainCar.
+      2: renderSpeed - None to not render, otherwise the number of seconds to
+                        sleep between each frame; this can be a floating point
+                        value."""
+
+    individual, continuous, renderSpeed = tup[0], tup[1], tup[2]
+
+    env = None
+    if continuous:
+        env = gym.make('MountainCarContinuous-v0')
+    else:
+        env = gym.make('MountainCar-v0')
+
+    maxFrames = 2000
+    runReward = 0
+    maxPosition = -1.2  # 1.2 is the minimum for this environment.
+    observation = env.reset()
+    individual.resetForNewTimeSeries()
+
+    for j in range(maxFrames):
+        # The continuous version doesn't required argmax, but it does need
+        # a conversion from a single value to the list that the environment
+        # expects:
+        if continuous:
+            action = [individual.calculateOutputs(observation)]
+        else:
+            action = np.argmax(individual.calculateOutputs(observation))
+
+        if renderSpeed is not None:
+            env.render()
+            if renderSpeed != 0:
+                time.sleep(renderSpeed)
+
+        observation, reward, done, info = env.step(action)
+        runReward += reward
+
+        # Record the furthest we made it up the hill:
+        maxPosition = max(observation[0], maxPosition)
+
+        if done:
+            break
+
+    env.close()
+
+    # Return the fitness, modified by the maxPosition attained:
+    return runReward + (10.0 * maxPosition)
+
 def getBipedalWalkerFitness_modifiedReward(individual, timesToRepeat, renderSpeed=None, hardcore=False, numThreads=10):
     """Handle calling the modified-reward bipedal walker fitness function in
     a multithreaded manner. A modified-reward version is provided because the
@@ -627,10 +718,22 @@ def mountainCarFitness(inputTuple):
                                 True, maxStepsPerRun=1000, renderSpeed=None,
                                 numThreads=10)
 
+def mountainCarFitness_modifiedReward(inputTuple):
+    return getMountainCarFitness_modifiedReward(inputTuple[0], 50,
+                                                renderSpeed=None,
+                                                continuous=False,
+                                                numThreads=10)
+
 def mountainCarContinuousFitness(inputTuple):
     return getGeneralGymFitness(inputTuple[0], 50, 'MountainCarContinuous-v0',
                                 False, maxStepsPerRun=1000, renderSpeed=None,
                                 numThreads=10)
+
+def mountainCarContinuousFitness_modifiedReward(inputTuple):
+    return getMountainCarFitness_modifiedReward(inputTuple[0], 50,
+                                                renderSpeed=None,
+                                                continuous=True,
+                                                numThreads=10)
 
 def bipedalWalkerFitness_modifiedReward(inputTuple):
     return getBipedalWalkerFitness_modifiedReward(inputTuple[0], 50,
@@ -699,7 +802,9 @@ def getEnvironmentTestFunction_tuple(env_id):
     funcSwitcher = {
       'CartPole-v1' : cartPoleFitness,
       'MountainCar-v0' : mountainCarFitness,
+      'MountainCar-v0_modifiedReward' : mountainCarFitness_modifiedReward,
       'MountainCarContinuous-v0' : mountainCarContinuousFitness,
+      'MountainCarContinuous-v0_modifiedReward' : mountainCarContinuousFitness_modifiedReward,
       'Pendulum-v0' : pendulumFitness,
       # 'Acrobot-v1' : NEED TO DEFINE,
       'LunarLander-v2' : lunarLanderFitness,
@@ -718,6 +823,12 @@ def getMaxScore(env_id):
       'CartPole-v1' : 500,
       'MountainCar-v0' : -110,
       'MountainCarContinuous-v0' : 90,
+      # Maximum position is 0.5, meaning (0.5 * 10) can be added to the score.
+      # Require that in the max score:
+      'MountainCar-v0_modifiedReward' : -105,
+      # Maximum position is 0.45, meaning (0.45 * 10) can be added to the score.
+      # Require that in the max score:
+      'MountainCarContinuous-v0_modifiedReward' : 94.5,
       'Pendulum-v0' : -130,
       # 'Acrobot-v1' : NEED TO DEFINE,
       'LunarLander-v2' : 200,
