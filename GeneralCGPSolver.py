@@ -683,6 +683,12 @@ Modules - %d, Primitives - %d. Primitive focus: %f." %
             if success:
                 print("Epoch " + str(epoch) + ": Found solution.")
                 self.__epochsToSolution = epoch
+
+                if self.periodicSaving is not None:
+                    # Save off our solution:
+                    fullFileName = self.periodicSaving['fileName'] + '_' + 'solution'
+                    self.save(fullFileName, forceSave=True)
+
                 break
 
         print("Done. Best fitness: %s. Secondary collapse fitness: %s" %
@@ -790,6 +796,12 @@ be provided.")
             if success:
                 print("Epoch " + str(epoch) + ": Found solution.")
                 self.__epochsToSolution = epoch
+
+                if self.periodicSaving is not None:
+                    # Save off our solution:
+                    fullFileName = self.periodicSaving['fileName'] + '_' + 'solution'
+                    self.save(fullFileName, forceSave=True)
+
                 break
 
         print("Done. Best fitness: %s. Secondary collapse fitness: %s" %
