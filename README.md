@@ -1,5 +1,5 @@
 # cgp
-A general purpose, extensible, CGP library in Python.  MIT
+A general purpose, extensible, CGP library in Python.
 
 CGP is a library which implements a general purpose Cartesian Genetic Programming framework.
 
