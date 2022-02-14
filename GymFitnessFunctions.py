@@ -1,6 +1,7 @@
 import gym
-import pybulletgym
+# import pybulletgym
 import numpy as np
+import pandas as pd
 import time
 import random
 import math
@@ -268,14 +269,29 @@ def getGeneralGymSingleRunFitness(tup):
     The input tuple is expected to be defined as such:
     0: The individual
     1: Render speed. None for no rendering.
+    2: Render mode. None if no rendering, or no mode needed for rendering.
     2: Maximum steps in the simulation.
     3: Take max. True if argmax should be applied to the action, False otherwise.
     4: Environment name.
+    5: Environment parameters.
+    6: Convert to np.array()
+    7: A filename to which to write out the run's data
     """
-    individual, renderSpeed, maxSteps, takeMax, envName = \
-      tup[0], tup[1], tup[2], tup[3], tup[4]
+    individual, renderSpeed, renderMode, maxSteps, takeMax, envName, envParams, npConvert, csvFileName = \
+      tup[0], tup[1], tup[2], tup[3], tup[4], tup[5], tup[6], tup[7], tup[8]
 
-    env = gym.make(envName)
+    # Use them if they passed in parameters:
+    env = None
+    if envParams is not None:
+        env = gym.make(envName, **envParams)
+    else:
+        env = gym.make(envName)
+
+    # Ready our dataframe if needed:
+    df = None
+    if csvFileName is not None:
+        df = pd.DataFrame()
+
     observation = env.reset()
     runReward = 0
     individual.resetForNewTimeSeries()
@@ -291,20 +307,33 @@ def getGeneralGymSingleRunFitness(tup):
             if isinstance(action, int) or isinstance(action, float):
                 action = [action]
 
+            if npConvert:
+                action = np.array(action)
+
         if renderSpeed is not None:
-            env.render()
+            if renderMode is None:
+                env.render()
+            else:
+                env.render(mode=renderMode)
             if renderSpeed != 0:
                 time.sleep(renderSpeed)
 
         observation, reward, done, info = env.step(action)
         runReward += reward
+
+        if csvFileName is not None:
+            df = df.append(info, ignore_index=True)
+
         if done:
             break
 
     env.close()
+    if csvFileName is not None:
+        df.to_csv(csvFileName)
+
     return runReward
 
-def getGeneralGymFitness(individual, timesToRepeat, envName, useArgmax, maxStepsPerRun=1000, renderSpeed=None, numThreads=10):
+def getGeneralGymFitness(individual, timesToRepeat, envName, useArgmax, maxStepsPerRun=1000, renderSpeed=None, renderMode=None, numThreads=10, envParams=None, npConvert=False, csvFileName=None):
     """Get multiple fitnesses for a single individual in a multithreaded
     manner. Because fitnesses can vary dramatically from run to run, often many
     runs are combined into a single fitness for an individual.
@@ -312,18 +341,37 @@ def getGeneralGymFitness(individual, timesToRepeat, envName, useArgmax, maxSteps
     # Build a list of times to repeat to make zipping easier:
     repeats = [i for i in range(timesToRepeat)]
 
-    # Get our process pool:
-    pool = Pool(numThreads)
+    allScores = []
+    if numThreads > 1:
+        # Get our process pool:
+        pool = Pool(numThreads)
 
-    # See getGeneralGymSingleRunFitness for a list of the arguments expected in
-    # each tuple:
-    allScores = pool.map(getGeneralGymSingleRunFitness,
-                         zip(itertools.repeat(individual),
-                             itertools.repeat(renderSpeed),
-                             itertools.repeat(maxStepsPerRun),
-                             itertools.repeat(useArgmax),
-                             itertools.repeat(envName),
-                             repeats))
+        # See getGeneralGymSingleRunFitness for a list of the arguments expected in
+        # each tuple:
+        allScores = pool.map(getGeneralGymSingleRunFitness,
+                             zip(itertools.repeat(individual),
+                                 itertools.repeat(renderSpeed),
+                                 itertools.repeat(renderMode),
+                                 itertools.repeat(maxStepsPerRun),
+                                 itertools.repeat(useArgmax),
+                                 itertools.repeat(envName),
+                                 itertools.repeat(envParams),
+                                 itertools.repeat(npConvert),
+                                 itertools.repeat(csvFileName),
+                                 repeats))
+    else:
+        # Run without threads:
+        allScores = map(getGeneralGymSingleRunFitness,
+                        zip(itertools.repeat(individual),
+                            itertools.repeat(renderSpeed),
+                            itertools.repeat(renderMode),
+                            itertools.repeat(maxStepsPerRun),
+                            itertools.repeat(useArgmax),
+                            itertools.repeat(envName),
+                            itertools.repeat(envParams),
+                            itertools.repeat(npConvert),
+                            itertools.repeat(csvFileName),
+                            repeats))
 
     # Requesting the list will cause this line to block until all threads have
     # finished and returned a result:
@@ -447,8 +495,12 @@ def getOneRunMountainCarFitness_modifiedReward(tup):
 
     env.close()
 
-    # Return the fitness, modified by the maxPosition attained:
-    return runReward + (10.0 * maxPosition)
+    # Return the fitness, modified by the maxPosition attained. The position
+    # weighs heavier with the continuous version:
+    if continuous:
+        return runReward + (1000.0 * maxPosition)
+    else:
+        return runReward + (10.0 * maxPosition)
 
 def getBipedalWalkerFitness_modifiedReward(individual, timesToRepeat, renderSpeed=None, hardcore=False, numThreads=10):
     """Handle calling the modified-reward bipedal walker fitness function in
@@ -693,8 +745,34 @@ def getOneAtariFitness_screen(individual, environmentName=None, maxSteps=18000,
 # GeneralCGPSolver) are provided which call the general fitness functions.
 # Currently, all Gym fitness functions run 50 trials using 10 threads.
 
+# We can't just return a single function; we must create a class so that
+# Python can pickle it to facilitate multiprocessing:
+class generalTupleFitnessFunction:
+    def __init__(self, timesToRepeat, envName, useArgmax, maxStepsPerRun=1000, renderSpeed=None, renderMode=None, numThreads=10, envParams=None, npConvert=False, csvFileName=None):
+        self.timesToRepeat = timesToRepeat
+        self.envName = envName
+        self.useArgmax = useArgmax
+        self.maxStepsPerRun = maxStepsPerRun
+        self.renderSpeed = renderSpeed
+        self.renderMode = renderMode
+        self.numThreads = numThreads
+        self.envParams = envParams
+        self.npConvert = npConvert
+        self.csvFileName = csvFileName
+
+    def fitnessFunc(self, inputTuple):
+        return getGeneralGymFitness(inputTuple[0], self.timesToRepeat,
+                                    self.envName, self.useArgmax,
+                                    maxStepsPerRun=self.maxStepsPerRun,
+                                    renderSpeed=self.renderSpeed,
+                                    renderMode=self.renderMode,
+                                    numThreads=self.numThreads,
+                                    envParams=self.envParams,
+                                    npConvert=self.npConvert,
+                                    csvFileName=self.csvFileName)
+
 def cartPoleFitness(inputTuple):
-    return getGeneralGymFitness(inputTuple[0], 50, 'CartPole-v1', True,
+    return getGeneralGymFitness(inputTuple[0], 5, 'CartPole-v1', True,
                                 maxStepsPerRun=500, renderSpeed=None,
                                 numThreads=10)
 
@@ -826,9 +904,9 @@ def getMaxScore(env_id):
       # Maximum position is 0.5, meaning (0.5 * 10) can be added to the score.
       # Require that in the max score:
       'MountainCar-v0_modifiedReward' : -105,
-      # Maximum position is 0.45, meaning (0.45 * 10) can be added to the score.
+      # Maximum position is 0.45, meaning (0.45 * 1000) can be added to the score.
       # Require that in the max score:
-      'MountainCarContinuous-v0_modifiedReward' : 94.5,
+      'MountainCarContinuous-v0_modifiedReward' : 540.0,
       'Pendulum-v0' : -130,
       # 'Acrobot-v1' : NEED TO DEFINE,
       'LunarLander-v2' : 200,

@@ -3,6 +3,7 @@ import copy
 import inspect
 import itertools
 import math
+import sys
 
 import AbstractCGPIndividual
 
@@ -282,6 +283,31 @@ class FFCGPANNIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
             outputs = outputs[0]
 
         return outputs
+    def getOneMutatedChild(self, mutationStrategy):
+        """Return a mutated child based upon this individual and the given
+        mutation strategy."""
+
+        # Mutation rate and number of genes to mutate are given as ranges.
+        # We need to select a value from within the available range.
+
+        # Apply a certain chance of mutation to all genes:
+        if mutationStrategy['name'].lower() == 'probability':
+            return self.__getProbabilisticMutatedChild(
+                genMutationRate=random.uniform(mutationStrategy['genRate'][0],
+                                               mutationStrategy['genRate'][1]),
+                outMutationRate=random.uniform(mutationStrategy['outRate'][0],
+                                               mutationStrategy['outRate'][1]),
+                application=mutationStrategy['application'])
+
+        # Mutate genes until at least X active genes are mutated. X is
+        # normally 1.
+        elif mutationStrategy['name'].lower() == 'activegene':
+            return self.__getActiveGeneMutatedChild(
+                numGenesToMutate=random.randint(
+                    mutationStrategy['numGenes'][0],
+                    mutationStrategy['numGenes'][1]))
+        else:
+            ValueError("Unknown mutation strategy.")
 
     def __getActiveGeneMutatedChild(self, numGenesToMutate=1):
         """Create and return a new individual that is the result of applying
@@ -289,6 +315,138 @@ class FFCGPANNIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
         child = copy.deepcopy(self)
         child.activeGeneMutate(numGenesToMutate)
         return child
+
+    def __getProbabilisticMutatedChild(self, genMutationRate=0.01, outMutationRate=0.01, application='perGene'):
+        """Create and return a new individual that is the result of applying
+        probabilistic mutation to this individual."""
+        child = copy.deepcopy(self)
+        child.probabilisticMutate(child.__genotype, child.functionList,
+                                  child.pRange, child.maxColForward,
+                                  child.maxColBack, genMutationRate=genMutationRate,
+                                  outMutationRate=outMutationRate, application=application)
+        return child
+
+    def probabilisticMutate(self, genotype, functionList, pRange,
+                            maxColForward, maxColBack, genMutationRate=0.1,
+                            outMutationRate=0.1,
+                            totalInputCount=None, outputSize=None,
+                            rows=None, cols=None, application='pergene'):
+        """Mutate the provided genotype, given the provided parameters."""
+
+        if totalInputCount is None:
+            totalInputCount = self.totalInputCount
+
+        if outputSize is None:
+            outputSize = self.outputSize
+
+        if rows is None:
+            rows = self.rows
+
+        if cols is None:
+            cols = self.cols
+
+        for geneNum in range(totalInputCount, len(genotype)):
+            # Mutate outputs at a different rate than standard genes:
+            if len(genotype[geneNum]) == 1:
+                if random.random() <= outMutationRate:
+                    startVal = genotype[geneNum]
+                    attemptNumber = 0  # Rare case where there are no other choices
+                    while startVal == genotype[geneNum] and attemptNumber < 10:
+                        attemptNumber += 1
+                        newOut = self.getValidInputNodeNumber(
+                          geneNum, maxColForward, maxColBack,
+                          totalInputCount=totalInputCount,
+                          outputSize=outputSize, rows=rows, cols=cols)
+                        genotype[geneNum] = [newOut]
+
+            # Must be a generic node. Decide between applying the mutation rate
+            # per gene or per value inside the gene:
+            elif application.lower() == 'pergene':
+                if random.random() <= genMutationRate:
+                    allOptions = []
+
+                    # Build a list of all possible options so that we can choose
+                    # between them randomly:
+                    if len(self.functionList) > 1:
+                        allOptions.append('CF')  # Change function
+
+                    if self.pRange is not None:
+                        allOptions.append('CB') # Change bias
+
+                    if len(genotype[geneNum]) <= self.__inputsPerNeuron[1]:
+                        allOptions.append('AI')  # Add input
+
+                    # Remove input isn't done on a per-input basis so that it has
+                    # the same chance as add-input
+                    if len(genotype[geneNum]) -1 > self.__inputsPerNeuron[0]:
+                        allOptions.append('RI')  # Remove input
+
+                    if len(self.__switchValues) > 1 and \
+                      self.__switchValues[0] != self.__switchValues[1]:
+                        for i in range(2, len(genotype[geneNum])):
+                            allOptions.append('CS_%d' % (i))  # Change switch
+
+                    for i in range(2, len(genotype[geneNum])):
+                        allOptions.append('CW_%d' % (i))  # Change weight
+                        allOptions.append('CT_%d' % (i))  # Change target
+
+                    # Choose what we're mutating:
+                    selection = allOptions[random.randint(0, len(allOptions) - 1)]
+                    category = selection[:2]
+                    inputNum = None
+                    if len(selection) > 2:
+                        inputNum = int(selection[3:])
+
+                    # Mutate the gene we chose in the manner we found:
+                    if category == 'CF':
+                        self.chooseNewFunction(genotype, geneNum)
+                    elif category == 'CB':
+                        self.chooseNewBias(genotype, geneNum)
+                    elif category == 'AI':
+                        self.addInput(genotype, geneNum)
+                    elif category == 'RI':
+                        self.removeInput(genotype, geneNum)
+                    elif category == 'CS':
+                        self.changeSwitch(genotype, geneNum, inputNum)
+                    elif category == 'CW':
+                        self.changeWeight(genotype, geneNum, inputNum)
+                    elif category == 'CT':
+                        self.changeTarget(genotype, geneNum, inputNum)
+
+            elif application.lower() == 'pervalue':
+                # Check the mutation once for each value in the entire gene:
+                # Mutate function:
+                if random.random() <= genMutationRate and len(functionList) > 1:
+                    self.chooseNewFunction(genotype, geneNum)
+
+                # Mutate the parameter (P):
+                if random.random() <= genMutationRate:
+                    self.chooseNewBias(genotype, geneNum)
+
+                # Mutate all of our inputs' values separately:
+                for inputNum in range(2, len(genotype[geneNum])):
+                    if random.random() <= genMutationRate:
+                        self.changeWeight(genotype, geneNum, inputNum)
+                    if random.random() <= genMutationRate:
+                        self.changeTarget(genotype, geneNum, inputNum)
+                    if len(self.__switchValues) > 1 and random.random() <= genMutationRate:
+                        self.changeSwitch(genotype, geneNum, inputNum)
+
+                # Add input:
+                if len(genotype[geneNum]) <= self.__inputsPerNeuron[1]:
+                    if random.random() <= genMutationRate:
+                        self.addInput(genotype, geneNum)
+
+                # Remove input:
+                if len(genotype[geneNum]) -1 > self.__inputsPerNeuron[0]:
+                    if random.random() <= genMutationRate:
+                        self.removeInput(genotype, geneNum)
+
+            else:
+                raise ValueError("Unknown mutation application strategy: %s" %
+                                 (application))
+
+        self.__activeGenes = None
 
     def activeGeneMutate(self, numGenesToMutate):
         """Mutate my own genotype in an active-gene mutation manner."""
@@ -319,7 +477,7 @@ class FFCGPANNIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
                                                self.outputSize, self.rows,
                                                self.cols)
             # Standard node, need to decide between many options:
-            # Change the unction, change the bias, change a switch,
+            # Change the function, change the bias, change a switch,
             # add an input, remove an input, change an input's weight,
             # change an input's switch, or change an input's target.
             else:
@@ -341,7 +499,8 @@ class FFCGPANNIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
                 if len(genotype[geneNum]) -1 > self.__inputsPerNeuron[0]:
                     allOptions.append('RI')  # Remove input
 
-                if len(self.__switchValues) > 1:
+                if len(self.__switchValues) > 1 and \
+                  self.__switchValues[0] != self.__switchValues[1]:
                     for i in range(2, len(genotype[geneNum])):
                         allOptions.append('CS_%d' % (i))  # Change switch
 
@@ -444,32 +603,6 @@ class FFCGPANNIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
                                            self.outputSize, self.rows,
                                            self.cols)
 
-    def getOneMutatedChild(self, mutationStrategy):
-        """Return a mutated child based upon this individual and the given
-        mutation strategy."""
-
-        # Mutation rate and number of genes to mutate are given as ranges.
-        # We need to select a value from within the available range.
-
-        # Apply a certain chance of mutation to all genes:
-        if mutationStrategy['name'].lower() == 'probability':
-            return self.__getProbabilisticMutatedChild(
-                genMutationRate=random.uniform(mutationStrategy['genRate'][0],
-                                               mutationStrategy['genRate'][1]),
-                outMutationRate=random.uniform(mutationStrategy['outRate'][0],
-                                               mutationStrategy['outRate'][1]),
-                application=mutationStrategy['application'])
-
-        # Mutate genes until at least X active genes are mutated. X is
-        # normally 1.
-        elif mutationStrategy['name'].lower() == 'activegene':
-            return self.__getActiveGeneMutatedChild(
-                numGenesToMutate=random.randint(
-                    mutationStrategy['numGenes'][0],
-                    mutationStrategy['numGenes'][1]))
-        else:
-            ValueError("Unknown mutation strategy.")
-
     def performOncePerEpochUpdates(self, listAllIndividuals, epochFitnesses):
         """Do nothing because FFCGPANN doesn't need to do any population-wide
         processing each epoch."""
@@ -478,3 +611,6 @@ class FFCGPANNIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
     def printGenotype(self):
         """Print out our genotype for debug purposes."""
         self.printGivenGenotype(self.__genotype)
+
+    def getGenotype(self):
+        return self.__genotype

@@ -16,8 +16,10 @@ warnings.filterwarnings("ignore")
 
 doNothing = TrainingOptimizers.doNothingOptimizer()
 
-envs = ["CartPole-v1", "MountainCar-v0", "MountainCarContinuous-v0",
-        "LunarLander-v2", "LunarLanderContinuous-v2"]
+# envs = ["CartPole-v1", "MountainCar-v0", "MountainCarContinuous-v0",
+#         "LunarLander-v2", "LunarLanderContinuous-v2"]
+
+envs = ["CartPole-v1"]
 
 fullTestList = []
 for env in envs:
@@ -36,8 +38,8 @@ for env in envs:
       'functionList': [functionLists.funcListANN_singleTan],
       'populationSize': [7],
       'numberParents': [1],
-      'maxEpochs': [5000],
-      'epochModOutput': [25],
+      'maxEpochs': [50],
+      'epochModOutput': [5],
       'bestFitness': [GymFitnessFunctions.getMaxScore(env)],
       'pRange': [[-1.0, 1.0]],
       'constraintRange': [[-1.0, 1.0]],
@@ -64,8 +66,8 @@ experimentFolder = "%s/multiEnvTest_2019_12_29" % (mainExperimentFolder)
 tester = MultiCGPTester.MultiCGPTester(
   fullTestList,
   runsPerVariation = 2,
-  periodicModelSaving = 50,
-  experimentFolder = experimentFolder)
+  periodicModelSaving = None,
+  experimentFolder = None)
 
 df = tester.runTests(None, None)
 

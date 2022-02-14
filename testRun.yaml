@@ -1,0 +1,379 @@
+command:
+- ${env}
+- python
+- ${program}
+- ${args}
+method: random
+metric:
+  goal: minimize
+  name: epochsToSolution
+name: CGP_3Change_3Control_punishBadBehavior
+parameters:
+  CGP_bestFitness:
+    value: 10000
+  CGP_completeFitnessCollapseFunction:
+    value: FitnessCollapseFunctions.minimum
+  CGP_constraintRange:
+    value:
+    - -1
+    - 1
+  CGP_csvFileName:
+    value: None
+  CGP_epochModOutput:
+    value: 10
+  CGP_fitnessCollapseFunction:
+    value: FitnessCollapseFunctions.minOfMeanMedian
+  CGP_functionList:
+    value: functionLists.funcListANN_singleTan
+  CGP_inputMemory:
+    value: None
+  CGP_inputSize:
+    value: 11
+  CGP_maxEpochs:
+    value: 5000
+  CGP_mutationStrategy_name:
+    value: activeGene
+  CGP_mutationStrategy_numGenes:
+    value:
+    - 1
+    - 3
+  CGP_numThreads:
+    value: 4
+  CGP_numberParents:
+    value: 1
+  CGP_outputSize:
+    value: 3
+  CGP_pRange:
+    value:
+    - -1
+    - 1
+  CGP_parentSelectionStrategy:
+    value: RoundRobin
+  CGP_populationSize:
+    value: 8
+  CGP_shape_colCount:
+    distribution: categorical
+    values:
+    - 500
+    - 1000
+  CGP_shape_maxColBack:
+    value: 1001
+  CGP_shape_maxColForward:
+    value: -1
+  CGP_shape_rowCount:
+    value: 1
+  CGP_type:
+    value: FFCGPANN
+  CGP_variationSpecificParameters_inputsPerNeuron:
+    distribution: categorical
+    values:
+    - - 5
+      - 5
+    - - 9
+      - 9
+    - - 15
+      - 15
+    - - 2
+      - 15
+  CGP_variationSpecificParameters_switchValues:
+    value:
+    - 1
+  CGP_variationSpecificParameters_weightRange:
+    value:
+    - -1
+    - 1
+  CGP_wandbModelSave:
+    value: true
+  CGP_wandbStatRecord:
+    value: true
+  ENV_action-0:
+    value: aileron_cmd
+  ENV_action-1:
+    value: elevator_cmd
+  ENV_action-2:
+    value: throttle_cmd
+  ENV_action-3:
+    value: ""
+  ENV_action-4:
+    value: ""
+  ENV_action-5:
+    value: ""
+  ENV_action-6:
+    value: ""
+  ENV_action-7:
+    value: ""
+  ENV_action-8:
+    value: ""
+  ENV_action-9:
+    value: ""
+  ENV_action-10:
+    value: ""
+  ENV_airspeed_check_on_target:
+    value: true
+  ENV_altitude_check_on_target:
+    value: true
+  ENV_changeGoalRewardBonus:
+    value: 100
+  ENV_delta_airspeed_customScaling_max:
+    value: 40
+  ENV_delta_airspeed_customScaling_min:
+    value: -40
+  ENV_delta_airspeed_max:
+    value: 4400
+  ENV_delta_airspeed_min:
+    value: 0
+  ENV_delta_airspeed_scenario_max:
+    value: 40
+  ENV_delta_altitude_customScaling_max:
+    value: 2000
+  ENV_delta_altitude_customScaling_min:
+    value: -2000
+  ENV_delta_altitude_max:
+    value: 12000
+  ENV_delta_altitude_min:
+    value: -12000
+  ENV_delta_altitude_scenario_max:
+    value: 2000
+  ENV_delta_heading_customScaling_max:
+    value: 60
+  ENV_delta_heading_customScaling_min:
+    value: -60
+  ENV_delta_heading_max:
+    value: 180
+  ENV_delta_heading_min:
+    value: -180
+  ENV_delta_heading_scenario_max:
+    value: 60
+  ENV_excessiveRoll_lossPerDegree:
+    value: 0.01
+  ENV_excessiveRoll_low:
+    value: 30
+  ENV_good_enough_delta_airspeed:
+    value: 8
+  ENV_good_enough_delta_altitude:
+    value: 100
+  ENV_good_enough_delta_heading:
+    value: 5
+  ENV_heading_check_on_target:
+    value: true
+  ENV_info-aileron_cmd:
+    value: true
+  ENV_info-airspeed_knots:
+    value: true
+  ENV_info-altitude_sl_ft:
+    value: true
+  ENV_info-delta_airspeed:
+    value: true
+  ENV_info-delta_altitude:
+    value: true
+  ENV_info-delta_heading:
+    value: true
+  ENV_info-elevator_cmd:
+    value: true
+  ENV_info-engine_thrust_lbs:
+    value: true
+  ENV_info-heading_deg:
+    value: true
+  ENV_info-rudder_cmd:
+    value: true
+  ENV_info-sim_time_s:
+    value: true
+  ENV_info-throttle_cmd:
+    value: true
+  ENV_info-total_fuel_pounds:
+    value: true
+  ENV_info-used_fuel_pounds:
+    value: true
+  ENV_initial-aileron_cmd:
+    value: 0
+  ENV_initial-all_engine_running:
+    value: -1
+  ENV_initial-elevator_cmd:
+    value: 0
+  ENV_initial-gear:
+    value: 0
+  ENV_initial-gear_all_cmd:
+    value: 0
+  ENV_initial-initial_airspeed_knots:
+    value: 100
+  ENV_initial-initial_altitude_ft:
+    value: 1500
+  ENV_initial-initial_heading_deg:
+    value: 270
+  ENV_initial-initial_latitude_geod_deg:
+    value: 41.6611
+  ENV_initial-initial_longitude_geoc_deg:
+    value: -91.5302
+  ENV_initial-initial_p_radps:
+    value: 0
+  ENV_initial-initial_q_radps:
+    value: 0
+  ENV_initial-initial_r_radps:
+    value: 0
+  ENV_initial-initial_roc_fpm:
+    value: 0
+  ENV_initial-initial_terrain_altitude_ft:
+    value: 1e-08
+  ENV_initial-initial_v_fps:
+    value: 0
+  ENV_initial-initial_w_fps:
+    value: 0
+  ENV_initial-mixture_cmd:
+    value: 1
+  ENV_initial-rudder_cmd:
+    value: 0
+  ENV_initial-target_airspeed:
+    value: 100
+  ENV_initial-target_altitude:
+    value: 1500
+  ENV_initial-target_heading:
+    value: 270
+  ENV_initial-throttle_cmd:
+    value: 0.75
+  ENV_initializationFunction:
+    value: random3Targets
+  ENV_max_target_airspeed:
+    value: 120
+  ENV_max_target_airspeed_change:
+    value: 25
+  ENV_max_target_altitude:
+    value: 3000
+  ENV_max_target_altitude_change:
+    value: 1000
+  ENV_max_target_heading:
+    value: 179.9
+  ENV_max_target_heading_change:
+    value: 30
+  ENV_max_time_seconds:
+    value: 2000
+  ENV_min_target_airspeed:
+    value: 90
+  ENV_min_target_airspeed_change:
+    value: 10
+  ENV_min_target_altitude:
+    value: 500
+  ENV_min_target_altitude_change:
+    value: 200
+  ENV_min_target_heading:
+    value: -179.9
+  ENV_min_target_heading_change:
+    value: 10
+  ENV_numAirspeedStaggerLevels:
+    value: 30
+  ENV_numAltitudeStaggerLevels:
+    value: 30
+  ENV_numHeadingStaggerLevels:
+    value: 30
+  ENV_observation-0:
+    value: delta_altitude
+  ENV_observation-1:
+    value: delta_heading
+  ENV_observation-2:
+    value: v_fps
+  ENV_observation-3:
+    value: airspeed_knots
+  ENV_observation-4:
+    value: p_radps
+  ENV_observation-5:
+    value: q_radps
+  ENV_observation-6:
+    value: r_radps
+  ENV_observation-7:
+    value: pitch_rad
+  ENV_observation-8:
+    value: roll_rad
+  ENV_observation-9:
+    value: delta_airspeed
+  ENV_observation-10:
+    value: throttle_cmd
+  ENV_observation-11:
+    value: aileron_cmd
+  ENV_observation-12:
+    value: elevator_cmd
+  ENV_observation-13:
+    value: ""
+  ENV_observation-14:
+    value: ""
+  ENV_observation-15:
+    value: ""
+  ENV_on_target_seconds:
+    value: 29.9
+  ENV_onThreeGoalsRewardMultiplier:
+    value: 1.2
+  ENV_onTwoGoalsRewardMultiplier:
+    value: 1.1
+  ENV_perStepEntropy_aileron:
+    value: 0.2
+  ENV_perStepEntropy_aileron_lossPerStep:
+    value: 0.5
+  ENV_perStepEntropy_elevator_gain:
+    value: 0.15
+  ENV_perStepEntropy_elevator_loss:
+    value: 0.15
+  ENV_perStepEntropy_elevator_lossPerStep:
+    value: 0.5
+  ENV_perStepEntropy_rudder:
+    value: 0.2
+  ENV_perStepEntropy_rudder_lossPerStep:
+    value: 0.5
+  ENV_perStepEntropy_throttle:
+    value: 0.1
+  ENV_perStepEntropy_throttle_lossPerStep:
+    value: 0.5
+  ENV_print_task_debug_messages:
+    value: false
+  ENV_print_trace_messages:
+    value: false
+  ENV_rewardAirspeedWorth:
+    value: 0.33
+  ENV_rewardAltitudeWorth:
+    value: 0.33
+  ENV_rewardFunction:
+    value: staggeredRewardAltitudeHeadingAndAirspeed
+  ENV_rewardFunction_1:
+    value: punishExcessiveRoll
+  ENV_rewardFunction_2:
+    value: punishPerStepEntropy
+  ENV_rewardHeadingWorth:
+    value: 0.34
+  ENV_sim_steps_per_agent_step:
+    value: 15
+  ENV_target_airspeed:
+    value: 100
+  ENV_target_airspeed_update_chance:
+    value: 0.5
+  ENV_target_altitude:
+    value: 1500
+  ENV_target_altitude_update_chance:
+    value: 0.5
+  ENV_target_heading:
+    value: 270
+  ENV_target_heading_update_chance:
+    value: 0.5
+  ENV_terminalUpdateFunction:
+    value: targetAltitudeHeadingAndAirspeed
+  ENV_use_multiframe_smoothing:
+    value: false
+  ENV_worstCaseAirspeedDiff:
+    value: 40
+  ENV_worstCaseAltitudeDiff:
+    value: 2000
+  ENV_worstCaseHeadingDiff:
+    value: 60
+  envName:
+    value: PAINTTask-v0
+  epochModelSave:
+    value: 20
+  maxStepsPerRun:
+    value: 9000
+  npConvert:
+    value: true
+  numThreads:
+    value: 1
+  renderSpeed:
+    value: None
+  timesToRepeat:
+    value: 15
+  useArgmax:
+    value: false
+program: generalWandBCGPRunner.py

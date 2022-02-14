@@ -7,6 +7,12 @@ funcListANN = [funcs.ANN_Sigmoid, funcs.ANN_Tanh, funcs.ANN_Relu]
 funcListANN_singleTan = [funcs.ANN_Tanh]
 funcListANN_singleSigmoid = [funcs.ANN_Sigmoid]
 
+brainBasicList1 = [funcs.ADD, funcs.AMINUS, funcs.CMINUS, funcs.MULT,
+                   funcs.CMULT, funcs.ABS, funcs.SQRT, funcs.LT, funcs.GT,
+                   funcs.GTEP, funcs.LTEP, funcs.MIN2, funcs.MAX2]
+
+# brainListInput1 =
+
 vilFuncList = [funcs.ADD, funcs.AMINUS, funcs.MULT, funcs.CMULT, funcs.INV,
                funcs.ABS, funcs.SQRT, funcs.CPOW, funcs.YPOW, funcs.EXPX,
                funcs.SQRTXY, funcs.LT, funcs.GT, funcs.YWIRE, funcs.CONST,

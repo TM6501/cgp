@@ -8,6 +8,9 @@ import os
 import time
 import pickle
 
+# Recording results:
+import wandb
+
 # Concurrent.futures.ProcessPoolExecutor is used instead of
 # multiprocessing.Pool because it allows multiprocessing within multiprocessing.
 # Gathering fitnesses is done in a multithreaded manner inside this class.
@@ -62,7 +65,7 @@ class GeneralCGPSolver(BaseEstimator):
     # converted to integers:
     integerArguments = ['inputSize', 'outputSize', 'inputMemory',
                         'populationSize', 'numberParents', 'maxEpochs',
-                        'numThreads', 'epochModOutput']
+                        'numThreads', 'epochModOutput', 'wandbModelSave']
 
     def __init__(self,
                  type="BaseCGP",
@@ -87,6 +90,8 @@ class GeneralCGPSolver(BaseEstimator):
                  constraintRange=None,
                  periodicSaving=None,
                  csvFileName=None,
+                 wandbStatRecord=False,
+                 wandbModelSave=False,
                  fitnessCollapseFunction=FitnessCollapseFunctions.mean,
                  completeFitnessCollapseFunction=None,
                  mutationStrategy={'name': 'probability',
@@ -134,7 +139,7 @@ class GeneralCGPSolver(BaseEstimator):
                                             memory is needed for this value.
             fitnessFunction - A function that must take an indidividual, an
                               input, and an expected output and return a list
-                              of possible fitnesses for than individual.
+                              of possible fitnesses for that individual.
                               Deterministic versions can return a list of
                               length 1. This function MUST obey the rule:
                               "Bigger is better"; Higher fitness values must
@@ -208,6 +213,14 @@ class GeneralCGPSolver(BaseEstimator):
             csvFileName - If not None, expected to be a filename to which
                           stats will be saved in CSV format on a per-epoch
                           basis.
+            wandbStatRecord - If True, the following details will get recorded
+                              to WeightsAndBiases on each epoch:
+                                 - seconds to calculate that epoch
+                                 - Best individual's fitness
+                                 - Percentage nodes used by the best individual
+            wandbModelSave - If True, whenever there is a model saved off by
+                             the periodic model saving capability, that model
+                             will also be saved to WandB.
             fitnessCollapseFunction - The function used to take a list of
                                       output fitnesses from an individual and
                                       turn them into a single value that can be
@@ -347,7 +360,8 @@ class GeneralCGPSolver(BaseEstimator):
                 inputMemory=self.inputMemory,
                 pRange=self.pRange,
                 constraintRange=self.constraintRange,
-                functionList=self.functionList)
+                functionList=self.functionList,
+                baseSpecificParameters=self.variationSpecificParameters)
             return retInd
 
         elif self.type == "ModularCGP":
@@ -588,6 +602,8 @@ class GeneralCGPSolver(BaseEstimator):
         max_index, max_fitness = max(enumerate(fitnesses),
                                      key=operator.itemgetter(1))
 
+        percentNodesUsed = self.__population[max_index].getPercentageNodesUsed()
+
         if self.__csvFileHandle is not None:
             # Write out all of the stats we're tracking:
             # epochNumber, calc seconds, min, max, mean, median fitnesses,
@@ -599,19 +615,31 @@ class GeneralCGPSolver(BaseEstimator):
                float(max_fitness),
                float(FitnessCollapseFunctions.mean(fitnesses)),
                float(FitnessCollapseFunctions.median(fitnesses)),
-               float(self.__population[max_index].getPercentageNodesUsed())))
+               float(percentNodesUsed)))
 
             # Make sure the line gets flushed out to disk, in case we are
             # interrupted later:
             self.__csvFileHandle.flush()
             os.fsync(self.__csvFileHandle.fileno())
 
+        # Save to WeightsAndBiases. The calling script is expected to
+        # initialize our WandB connection for us:
+        if self.wandbStatRecord:
+            wandb.log({'Fitness': max_fitness,
+                       'Epoch Calculation Seconds': calcSec,
+                       'Percentage of Nodes Used': percentNodesUsed}, step=epoch)
+
         # Output to the screen:
+        epochModElapsedTime = datetime.datetime.now() - self.lastEpochModTimestamp
         if self.epochModOutput is not None and epoch % self.epochModOutput == 0:
-            print("Type: %s. Epoch %s. Percent nodes used: %.2f, Fitness: %.2f."
+            print("Type: %s. Epoch %s. Percent nodes used: %.2f, Time since last output: %.2f minutes, Fitness: %.2f."
                   % (self.type, str(epoch),
                      float(self.__population[max_index].getPercentageNodesUsed()),
+                     epochModElapsedTime.total_seconds() / 60.0,
                      float(fitnesses[max_index])))
+
+            self.lastEpochModTimestamp = datetime.datetime.now()
+
             if self.type == 'ModularCGP':
                 modules, primitives = self.__population[max_index].\
                   getNumberOfModulesAndPrimitiveFunctions()
@@ -627,6 +655,11 @@ Modules - %d, Primitives - %d. Primitive focus: %f." %
             fullFileName = self.periodicSaving['fileName'] + "_" + \
                            str(epoch)
             self.save(fullFileName, forceSave=True)
+
+            # Record the file to WandB as well:
+            if self.wandbModelSave:
+                wandb.save(fullFileName)
+
             fullFileName = self.periodicSaving['fileName'] + '_' + \
                            'mostRecent'
             self.save(fullFileName, forceSave=True)
@@ -657,8 +690,8 @@ Modules - %d, Primitives - %d. Primitive focus: %f." %
             epochFitnesses, completeEpochFitnesses = self.__calculateAllFitness_noData()
             elapsed = datetime.datetime.now() - start
 
-            if self.epochModOutput is not None and self.epochModOutput == 1:
-                print("\nFitness calculation time: %f seconds (%f minutes)" \
+            if self.epochModOutput is not None and (epoch % self.epochModOutput) == 0:
+                print("\nMost recent single fitness calculation time: %f seconds (%f minutes)" \
                       %(elapsed.total_seconds(), elapsed.total_seconds() / 60.0))
 
             # Occasional output to screen and file(s):
@@ -684,15 +717,32 @@ Modules - %d, Primitives - %d. Primitive focus: %f." %
                 print("Epoch " + str(epoch) + ": Found solution.")
                 self.__epochsToSolution = epoch
 
+                if self.wandbStatRecord:
+                    wandb.log({'epochsToSolution': self.__epochsToSolution,
+                                             'bestFitness': epochFitnesses[0]})
+
                 if self.periodicSaving is not None:
                     # Save off our solution:
                     fullFileName = self.periodicSaving['fileName'] + '_' + 'solution'
                     self.save(fullFileName, forceSave=True)
 
+                    if self.wandbModelSave:
+                        wandb.save(fullFileName)
+
                 break
+
 
         print("Done. Best fitness: %s. Secondary collapse fitness: %s" %
           (str(epochFitnesses[0]), str(completeEpochFitnesses[0])))
+
+        # Record a too-high epochsToSolution since this may be what we
+        # try to minimize:
+        if self.wandbStatRecord:
+            solutionEpochs = epoch
+            if not success:
+                solutionEpochs += 100
+            wandb.log({'epochsToSolution': solutionEpochs,
+                       'bestFitness': epochFitnesses[0]})
 
         self.fitted_ = True
         self.__alreadyTrained = True
@@ -743,6 +793,9 @@ be provided.")
 
         if self.fitnessFunction is None:
             raise ValueError("A fitness function must be provided.")
+
+        # Set our processing start time:
+        self.lastEpochModTimestamp = datetime.datetime.now()
 
         # If we've already been fitted, then make sure we keep the current
         # best individiual:
@@ -870,11 +923,15 @@ be provided.")
             tempFileHandle = self.__csvFileHandle
             self.__csvFileHandle = None
 
+            tempFitnessFunction = self.fitnessFunction
+            self.fitnessFunction = None
+
             pickle.dump(self, file)
 
             # Put them back:
             self.processPool = tempThreads
             self.__csvFileHandle = tempFileHandle
+            self.fitnessFunction = tempFitnessFunction
 
     def load(self, fileName):
         """Load ourselves from file."""

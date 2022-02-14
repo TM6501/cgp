@@ -65,7 +65,7 @@ class MultiCGPTester():
         if not isinstance(self.__inputParams, list):
             self.__inputParams = [self.__inputParams]
 
-    def runTests(self, X, Y):
+    def runTests(self, X, Y, confirmPrompt=True):
         """Run the actual tests, given the variables that were provided to
         us in the initialization function.
 
@@ -93,15 +93,19 @@ class MultiCGPTester():
 
         # Let the user know what we're about to do and give them the chance
         # to back out:
-        carryOn = input("Total runs: %d.  Start the tests (y/n)?" % (len(df)))
-        if carryOn.lower() != 'y':
-            print("Stopping.")
-            return
+        if confirmPrompt:
+            carryOn = input("Total runs: %d.  Start the tests (y/n)?" % (len(df)))
+            if carryOn.lower() != 'y':
+                print("Stopping.")
+                return
+        else:
+            print("Beginning training of %d total runs." % len(df))
 
         tempRet = []
 
         # Make the directory where we'll store our CSV files:
         infoFileHandle = None
+        modelsFileHandle = None
         if self.__experimentFolder is not None:
             try:
                 os.makedirs(self.__experimentFolder, exist_ok=True)
@@ -202,25 +206,31 @@ class MultiCGPTester():
 
             # Write those results out to our models csv file:
             # modelNumber, bestFitness, epochsToSolution, trainingMinutes
-            modelsFileHandle.write("%d,%.2f,%d,%.2f\n" % (i,
-              float(solver.getFinalFitness()), solver.getEpochsToSolution(),
-              float(elapsed.total_seconds() / 60.0)))
-            modelsFileHandle.flush()
-            os.fsync(modelsFileHandle.fileno())
+            if modelsFileHandle is not None:
+                modelsFileHandle.write("%d,%.2f,%d,%.2f\n" % (i,
+                  float(solver.getFinalFitness()), solver.getEpochsToSolution(),
+                  float(elapsed.total_seconds() / 60.0)))
+                modelsFileHandle.flush()
+                os.fsync(modelsFileHandle.fileno())
 
             # Write results out to the human-readable file:
-            infoFileHandle.write("finalFitness: %s\n" \
-              % (str(solver.getFinalFitness())))
-            infoFileHandle.write("epochsToSolution: %s\n" \
-              % (str(solver.getEpochsToSolution())))
-            infoFileHandle.write("minutesOfProcessing: %s\n\n" \
-              % (str(elapsed.total_seconds() / 60.0)))
-            infoFileHandle.flush()
-            os.fsync(infoFileHandle.fileno())
+            if infoFileHandle is not None:
+                infoFileHandle.write("finalFitness: %s\n" \
+                  % (str(solver.getFinalFitness())))
+                infoFileHandle.write("epochsToSolution: %s\n" \
+                  % (str(solver.getEpochsToSolution())))
+                infoFileHandle.write("minutesOfProcessing: %s\n\n" \
+                  % (str(elapsed.total_seconds() / 60.0)))
+                infoFileHandle.flush()
+                os.fsync(infoFileHandle.fileno())
 
         # Cleanup our files:
-        modelsFileHandle.close()
-        infoFileHandle.close()
+        if modelsFileHandle is not None:
+            modelsFileHandle.close()
+
+        if infoFileHandle is not None:
+            infoFileHandle.close()
+
         return df
 
     def getAllVariations(self):

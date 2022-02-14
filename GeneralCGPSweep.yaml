@@ -1,0 +1,491 @@
+program: generalWandBCGPRunner.py
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args}
+method: random   # bayes
+metric:
+  name: epochsToSolution
+  goal: minimize
+parameters:
+  # Parameters should be prepended with their destination:
+  # "CGP_": Parameters to GeneralCGPSolver
+  # "ENV_": Parameters to pass to the training environment
+  # "": No prepend value indicates the training script will have a direct use
+  #     for it.
+
+  CGP_type:
+    value: FFCGPANN
+
+  # Input (observation) and output (action) sizes:
+  CGP_inputSize:
+    value: 11
+  CGP_outputSize:
+    value: 3
+
+  # The shape of our network:
+  CGP_shape_rowCount:
+    value: 1
+  CGP_shape_colCount:
+    distribution: categorical
+    values:
+      - 500
+      - 1000
+  CGP_shape_maxColForward:
+    value: -1
+  CGP_shape_maxColBack:
+    value: 1001
+
+  CGP_inputMemory:
+    value: None
+
+  # The functions that the neurons can for activation:
+  CGP_functionList:
+    value: functionLists.funcListANN_singleTan
+
+  # Instead of a function list, we provide each function individually:
+  # func1:
+
+  # Population details:
+  CGP_populationSize:
+    value: 8
+  CGP_numberParents:
+    value: 1
+
+  # If there's more than 1 parent allowed, how we choose them:
+  CGP_parentSelectionStrategy:
+    value: RoundRobin
+
+  # Stop after this number of epochs, even if we have no solution:
+  CGP_maxEpochs:
+    value: 5000
+
+  # How often to output to the screen:
+  CGP_epochModOutput:
+    value: 10
+
+  # We're done if we hit this fitness:
+  CGP_bestFitness:
+    value: 10000
+
+  # The range p-values can take on. For most CGP types, p-values represent bias.
+  CGP_pRange:
+    value: [-1.0,1.0]
+
+  # Range that the output of a neuron can take on:
+  CGP_constraintRange:
+    value: [-1.0,1.0]
+
+  # When we run multiple times through the scenario, how should we crunch that
+  # list of fitnesses down to a single fitness on which we can sort:
+  CGP_fitnessCollapseFunction:
+    value: FitnessCollapseFunctions.minOfMeanMedian
+
+  # If we achieved best fitness, additional fitness collapse function which
+  # must also return a score greater than bestFitness:
+  CGP_completeFitnessCollapseFunction:
+    value: FitnessCollapseFunctions.minimum
+
+  # How we mutate our individuals:
+  CGP_mutationStrategy_name:
+    value: activeGene
+  CGP_mutationStrategy_numGenes:
+    value: [1,3]
+
+  # FFCGPANN specific parameters:
+  CGP_variationSpecificParameters_inputsPerNeuron:
+    distribution: categorical
+    values:
+      - [5,5]
+      - [9,9]
+      - [15,15]
+      - [2,15]
+
+  CGP_variationSpecificParameters_weightRange:
+    value: [-1.0,1.0]
+  CGP_variationSpecificParameters_switchValues:
+    value: [1]
+
+  # How many threads are allowed while calculating fitnesses:
+  CGP_numThreads:
+    value: 4
+
+  # Save stats and models to WandB:
+  CGP_wandbStatRecord:
+    value: True
+  CGP_wandbModelSave:
+    value: True
+
+  # Don't bother outputting to a local CSV:
+  CGP_csvFileName:
+    value: None
+
+  # Times to repeat the same test to gather a total individual fitness:
+  timesToRepeat:
+    value: 15
+  envName:
+    value: PAINTTask-v0
+  useArgmax:
+    value: False
+  maxStepsPerRun:  # > known max steps as per task definition is fine.
+    value: 9000
+  renderSpeed:
+    value: None
+  numThreads:  # How many threads each individual fitness should allocate.
+    value: 1
+  npConvert:
+    value: True
+  epochModelSave:  # How often to save the model to file and possibly WandB
+    value: 20
+
+  # Terminal update function and the variables it needs:
+  ENV_terminalUpdateFunction:
+    value: "targetAltitudeHeadingAndAirspeed"
+
+  # Lasted the full X seconds on target and goal is changing. How much bonus
+  # reward do we get?
+  ENV_changeGoalRewardBonus:
+    value: 100.0
+
+  # Function that overrides initial task and simulator variables:
+  ENV_initializationFunction:
+    value: "random3Targets"
+
+  # Number of seconds on all targets before you can move on to the next goal:
+  ENV_on_target_seconds:
+    value: 29.9
+
+  # For update chance:
+  # [0-1.0]  to indicate how often when goals change, this parameter's goal changes.
+  # 0.0 -> Never require the agent to change that.
+  # 1.0 -> Always require the agent to change that.
+
+  # Altitude:
+  ENV_altitude_check_on_target:  # Do we ensure the agent is on altitude before changing goals?
+    value: True
+  ENV_target_altitude_update_chance:
+    value: 0.5
+  ENV_target_altitude:  # The initial target altitude.
+    value: 1500
+  ENV_max_target_altitude:  # The maximum altitude that will be requested of the agent
+    value: 3000
+  ENV_min_target_altitude:  # Minimum requested altitude:
+    value: 500
+  ENV_min_target_altitude_change:  # The minimum altitude change to request
+    value: 200
+  ENV_max_target_altitude_change:  # Maximum altitude change to request
+    value: 1000
+  ENV_good_enough_delta_altitude:  # If we keep delta_altitude beneath this long enough, we can move on to our next goal.
+    value: 100
+  # If the altitude diff is ever outside this range, end the scenario in failure:
+  ENV_delta_altitude_scenario_max:
+    value: 2000
+  # Heading:
+  ENV_heading_check_on_target:  # Do we ensure the agent is on heading before changing goals?
+    value: True
+  ENV_target_heading_update_chance:
+    value: 0.5
+  ENV_target_heading:  # The initial target heading.
+    value: 270
+  ENV_max_target_heading:  # The maximum heading that will be requested of the agent
+    value: 179.9
+  ENV_min_target_heading:  # Minimum requested heading:
+    value: -179.9
+  ENV_min_target_heading_change:  # The minimum heading change to request
+    value: 10
+  ENV_max_target_heading_change:  # Maximum heading change to request
+    value: 30
+  ENV_good_enough_delta_heading:  # If we keep delta_heading beneath this long enough, we can move on to our next goal.
+    value: 5
+  ENV_delta_heading_scenario_max:
+    value: 60
+  # Airspeed:
+  ENV_airspeed_check_on_target:  # Do we ensure the agent is on airspeed before changing goals?
+    value: True
+  ENV_target_airspeed_update_chance:
+    value: 0.5
+  ENV_target_airspeed:  # The initial target airspeed.
+    value: 100
+  ENV_max_target_airspeed:  # The maximum airspeed that will be requested of the agent
+    value: 120
+  ENV_min_target_airspeed:  # Minimum requested airspeed:
+    value: 90
+  ENV_min_target_airspeed_change:  # The minimum airspeed change to request
+    value: 10
+  ENV_max_target_airspeed_change:  # Maximum airspeed change to request
+    value: 25
+  ENV_good_enough_delta_airspeed:  # If we keep delta_airspeed beneath this long enough, we can move on to our next goal.
+    value: 8
+  ENV_delta_airspeed_scenario_max:
+    value: 40
+
+  # These strongly influence the maximum possible score an agent can receive,
+  # be sure to check stop_training_score after updating either of these:
+  ENV_max_time_seconds:
+    value: 2000
+  ENV_sim_steps_per_agent_step:
+    value: 15  # 60Hz sim; 4 agent inputs per second.
+  # Instead of just letting the sim play for X frames with the inputs provided,
+  # start with the previous inputs and frame by frame make a linear
+  # interpolation to the new inputs.
+  ENV_use_multiframe_smoothing:
+    value: False
+
+
+  # Reward function and variables it needs:
+  ENV_rewardFunction:
+    value: "staggeredRewardAltitudeHeadingAndAirspeed"
+
+
+  # Altitude:
+  ENV_numAltitudeStaggerLevels:
+    value: 30
+  ENV_worstCaseAltitudeDiff:
+    value: 2000
+  ENV_rewardAltitudeWorth:
+    value: 0.33
+  # Heading:
+  ENV_numHeadingStaggerLevels:
+    value: 30
+  ENV_rewardHeadingWorth:
+    value: 0.34
+  ENV_worstCaseHeadingDiff:
+    value: 60
+  # Airspeed:
+  ENV_numAirspeedStaggerLevels:
+    value: 30
+  ENV_rewardAirspeedWorth:
+    value: 0.33
+  ENV_worstCaseAirspeedDiff:
+    value: 40
+
+  # Don't roll the plane in a dangerous manner:
+  ENV_rewardFunction_1:
+    value: "punishExcessiveRoll"
+  ENV_excessiveRoll_low:
+    value: 30.0
+  ENV_excessiveRoll_lossPerDegree:
+    value: 0.01
+
+  # Don't jerk on the controls too fast:
+  ENV_rewardFunction_2:
+    value: "punishPerStepEntropy"
+  ENV_perStepEntropy_aileron:
+    value: 0.2
+  ENV_perStepEntropy_aileron_lossPerStep:
+    value: 0.5
+  ENV_perStepEntropy_throttle:
+    value: 0.1
+  ENV_perStepEntropy_throttle_lossPerStep:
+    value: 0.5
+  ENV_perStepEntropy_rudder:
+    value: 0.2
+  ENV_perStepEntropy_rudder_lossPerStep:
+    value: 0.5
+  # Elevator is treated differently since pushing is more of a problem than
+  # pulling:
+  ENV_perStepEntropy_elevator_loss:
+    value: 0.15
+  ENV_perStepEntropy_elevator_gain:
+    value: 0.15
+  ENV_perStepEntropy_elevator_lossPerStep:
+    value: 0.5
+
+  # Goal multipliers when me are managing to stay on 2 or 3 goals
+  # simultaneously. These now allow for rewards greater than 1.0.
+  # Their usage requires some of the parameters used by the update function;
+  # see PAINTRewards.py for more details.
+  ENV_onTwoGoalsRewardMultiplier:
+    value: 1.1
+  ENV_onThreeGoalsRewardMultiplier:
+    value: 1.2
+  # End variables required by reward.
+
+  # Observations:
+  # If a property variable isn't already in properties.py, you are expected
+  # to provide propName_min and propName_max.
+  # customScaling min and max effectively provide values where the observation
+  # would rail at -1 or 1. All values outside of the customScaling min and
+  # max will convert to -1 or 1. These only need to be provided if you want
+  # them to be something other than the value's minimum and maximum.
+  ENV_observation-0:
+    value: "delta_altitude"                # Target alt - actual alt
+  ENV_delta_altitude_min:
+    value: -12000
+  ENV_delta_altitude_max:
+    value: 12000
+  ENV_delta_altitude_customScaling_min:
+    value: -2000
+  ENV_delta_altitude_customScaling_max:
+    value: 2000
+  ENV_observation-1:
+    value: "delta_heading"                # headingDiff [-180, 180]
+  ENV_delta_heading_min:
+    value: -180
+  ENV_delta_heading_max:
+    value: 180
+  ENV_delta_heading_customScaling_min:
+    value: -60
+  ENV_delta_heading_customScaling_max:
+    value: 60
+  ENV_observation-2:
+    value: "v_fps"                        # Downward velocity.
+  ENV_observation-3:
+    value: "airspeed_knots"               # Airspeed, knots [0, 4400]
+  ENV_observation-4:
+    value: "p_radps"                      # Roll rate, rad / s  [-2 * pi, 2 * pi]
+  ENV_observation-5:
+    value: "q_radps"                      # Pitch rate, rad / s [-2 * pi, 2 * pi]
+  ENV_observation-6:
+    value: "r_radps"                      # Yaw rate, rad / s [-2 * pi, 2 * pi]
+  ENV_observation-7:
+    value: "pitch_rad"                    # Pitch, rad [-0.5 * pi, 0.5 * pi]
+  ENV_observation-8:
+    value: "roll_rad"                     # Roll, rad [-pi, pi]
+  ENV_observation-9:
+    value: "delta_airspeed"
+  ENV_delta_airspeed_min:
+    value: 0
+  ENV_delta_airspeed_max:
+    value: 4400
+  ENV_delta_airspeed_customScaling_min:
+    value: -40
+  ENV_delta_airspeed_customScaling_max:
+    value: 40
+  ENV_observation-10:
+    value: "throttle_cmd"
+  ENV_observation-11:
+    value: "aileron_cmd"
+  ENV_observation-12:
+    value: "elevator_cmd"
+  ENV_observation-13:
+    value: ""
+  ENV_observation-14:
+    value: ""
+  ENV_observation-15:
+    value: ""
+  # Actions:
+  ENV_action-0:
+    value: "aileron_cmd"
+  ENV_action-1:
+    value: "elevator_cmd"
+  ENV_action-2:
+    value: "throttle_cmd"
+
+  # Add additional processing for the throttle:
+  # ENV_inputProcessor-throttle_cmd:
+    # value: "changeLimiter"
+  # ENV_throttle_cmd_maxChange:
+    # value: 0.15
+    # distribution: uniform
+    # min: 0.02
+    # max: 0.25
+
+  ENV_action-3:
+    value: ""    #  "rudder_cmd",  # Default doesn't use the rudder.
+  ENV_action-4:
+    value: ""
+  ENV_action-5:
+    value: ""
+  ENV_action-6:
+    value: ""
+  ENV_action-7:
+    value: ""
+  ENV_action-8:
+    value: ""
+  ENV_action-9:
+    value: ""
+  ENV_action-10:
+    value: ""
+  # Initial Conditions:
+  ENV_initial-initial_altitude_ft:
+    value: 1500
+  ENV_initial-target_altitude:
+    value: 1500
+  ENV_initial-initial_terrain_altitude_ft:
+    value: 0.00000001
+  ENV_initial-initial_longitude_geoc_deg:
+    value: -91.5302
+  ENV_initial-initial_latitude_geod_deg:
+    value: 41.6611
+  #ENV_initial-initial_u_fps:
+  #  value: 0
+  ENV_initial-seconds_until_goal_change:
+    value: -1
+  ENV_initial-initial_airspeed_knots:
+    value: 100
+  ENV_initial-target_airspeed:
+    value: 100
+  ENV_initial-initial_v_fps:
+    value: 0
+  ENV_initial-initial_w_fps:
+    value: 0
+  ENV_initial-initial_p_radps:
+    value: 0
+  ENV_initial-initial_q_radps:
+    value: 0
+  ENV_initial-initial_r_radps:
+    value: 0
+  ENV_initial-initial_roc_fpm:
+    value: 0
+  ENV_initial-initial_heading_deg:
+    value: 270
+  ENV_initial-target_heading:
+    value: 270
+  ENV_initial-gear:
+    value: 0.0
+  ENV_initial-gear_all_cmd:
+    value: 0.0
+  ENV_initial-all_engine_running:
+    value: -1      # -1: value: Set all engines running.
+  ENV_initial-mixture_cmd:
+    value: 1
+  ENV_initial-throttle_cmd:
+    value: 0.75
+  ENV_initial-rudder_cmd:
+    value: 0
+  ENV_initial-aileron_cmd:
+    value: 0
+  ENV_initial-elevator_cmd:
+    value: 0
+  ENV_initial-target_altitude:
+    value: 1500
+  ENV_initial-target_heading:
+    value: 270
+  ENV_initial-target_airspeed:
+    value: 100
+
+  ENV_print_task_debug_messages:
+    value: False
+  ENV_print_trace_messages:
+    value: False
+
+  ENV_info-sim_time_s:
+    value: True
+  ENV_info-altitude_sl_ft:
+    value: True
+  ENV_info-heading_deg:
+    value: True
+  ENV_info-delta_altitude:
+    value: True
+  ENV_info-delta_heading:
+    value: True
+  ENV_info-delta_airspeed:
+    value: True
+  ENV_info-airspeed_knots:
+    value: True
+  ENV_info-total_fuel_pounds:
+    value: True
+  ENV_info-used_fuel_pounds:
+    value: True
+  ENV_info-aileron_cmd:
+    value: True
+  ENV_info-elevator_cmd:
+    value: True
+  ENV_info-rudder_cmd:
+    value: True
+  ENV_info-throttle_cmd:
+    value: True
+  ENV_info-engine_thrust_lbs:
+    value: True

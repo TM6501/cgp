@@ -21,7 +21,8 @@ class CGPIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
                  inputMemory=None,
                  pRange=None,
                  constraintRange=None,
-                 functionList=None):
+                 functionList=None,
+                 baseSpecificParameters={}):
         # Set all of the initialization variables:
         args, _, _, values = inspect.getargvalues(inspect.currentframe())
         values.pop("self")
@@ -39,6 +40,10 @@ class CGPIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
         self.maxColBack = self.shape['maxColBack']
 
         self.integerConversion()
+
+        # Collect our specific parameters:
+        self.useSeparateScaleValues = baseSpecificParameters.get('useSeparateScaleValues', False)
+        self.scaleRange = baseSpecificParameters.get('scaleRange', None)
 
         # Our total number of inputs will be the size of our input array plus
         # any stored memory:
@@ -67,6 +72,8 @@ class CGPIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
         print("maxColForward: " + str(self.maxColForward))
         print("maxColBack: " + str(self.maxColBack))
         print("pRange: " + str(self.pRange))
+        if self.useSeparateScaleValues:
+            print(f"Scale Range: {self.scaleRange}")
 
         print("Genotype: ")
         self.printGenotype()
@@ -79,6 +86,72 @@ class CGPIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
 
         self.__activeGenes = None
 
+    def getRandomizedGenotype(self, functionList, rows, cols, maxColForward,
+                              maxColBack, pRange, totalInputCount, outputSize):
+        """Return a randomized genotype based upon the given parameters. It
+        only uses primitive functions and won't create or use modules."""
+        genotype = []
+        numFunctions = len(functionList)
+        numNodes = (rows * cols) + totalInputCount
+
+        for nodeNum in range(numNodes):
+            # Determine the acceptable inputs:
+            colNum = self.getColumnNumber(nodeNum,
+                                          totalInputCount=totalInputCount,
+                                          outputSize=outputSize,
+                                          rows=rows, cols=cols)
+
+            # Specially mark input columns:
+            if colNum == 0:
+                gene = {"Type": 'Input'}
+            else:  # Standard column:
+                # Full gene: {'Type', 'Function' 'X', 'Y', 'P', 'Scale' [optional]}
+                gene = {'Type': 'Processing'}
+
+                # Add the function to the gene:
+                gene['Function'] = random.randint(0, numFunctions-1)
+
+                # Add 2 random inputs from the node range:
+                gene['X'] = self.getValidInputNodeNumber(nodeNum,
+                  maxColForward, maxColBack,
+                  totalInputCount=totalInputCount, outputSize=outputSize,
+                  rows=rows, cols=cols)
+
+                gene['Y'] = self.getValidInputNodeNumber(nodeNum,
+                  maxColForward, maxColBack,
+                  totalInputCount=totalInputCount, outputSize=outputSize,
+                  rows=rows, cols=cols)
+
+                # Add our P parameter, Real number:
+                gene['P'] = random.uniform(pRange[0], pRange[1])
+
+                # Add a scale if needed:
+                if self.useSeparateScaleValues:
+                    gene['Scale'] = random.uniform(self.scaleRange[0],
+                                                   self.scaleRange[1])
+
+            # Add this gene to the genome:
+            genotype.append(gene)
+
+        # Add the outputs. First, get the acceptable range:
+        minCol = max(cols + 1 - maxColBack, 0)
+        maxCol = cols
+
+        minNodeNum, _ = self.getNodeNumberRange(minCol,
+          totalInputCount=totalInputCount, outputSize=outputSize, rows=rows,
+          cols=cols)
+
+        _, maxNodeNum = self.getNodeNumberRange(maxCol,
+          totalInputCount=totalInputCount, outputSize=outputSize, rows=rows,
+          cols=cols)
+
+        for outNum in range(outputSize):
+            # Output nodes only have a single value: A node number to output
+            genotype.append({'Type': 'Output',
+                             'Input': random.randint(minNodeNum, maxNodeNum)})
+
+        return genotype
+
     def getPercentageNodesUsed(self):
         """Return the percentage of nodes in the active path through the
         genotype."""
@@ -87,20 +160,27 @@ class CGPIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
 
     def printGenotype(self):
         """Utility function to print the genome for debugging purposes."""
-        for row in range(self.rows):
-            for col in range(self.cols):
-                geneNumber = (col * (self.rows - 1)) + col + row + \
-                             self.totalInputCount
+        # for row in range(self.rows):
+        #     for col in range(self.cols):
+        #         geneNumber = (col * (self.rows - 1)) + col + row + \
+        #                      self.totalInputCount
+        #         print(f"{geneNumber}: {self.__genotype[geneNumber]}")
                 # If it is an input or output column, just print:
-                if col == 0 or col == self.cols - 1:
-                    print(str(self.__genotype[geneNumber]) + " ", end='')
-                else:  # Need to format the floating point number:
-                    print("[%d %d %d %.2f]" % (self.__genotype[geneNumber][0],
-                                               self.__genotype[geneNumber][1],
-                                               self.__genotype[geneNumber][2],
-                                               self.__genotype[geneNumber][3]))
-            print("\n")
-        print("Out: " + str(self.__genotype[-self.outputSize:]))
+                # if col == 0 or col == self.cols - 1:
+                #     print(f"Gene type: {self.__genotype[geneNumber]['Type']}")
+                # else:  # Need to format the floating point number:
+                #     outString = f"Function Number: {self.__genotype[geneNumber]['Function']}, "
+                #     outString += f"X: {self.__genotype[geneNumber]['X']}, "
+                #     outString += f"Y: {self.__genotype[geneNumber]['Y']}, "
+                #     outString += f"P: {self.__genotype[geneNumber]['P']}"
+                #     # If we have a scale value, use it:
+                #     if self.useSeparateScaleValues:
+                #         outString += f", Scale: {self.__genotype[geneNumber]['Scale']}"
+                #     print(outString)
+        #     print("\n")
+        # print("Out: " + str(self.__genotype[-self.outputSize:]))
+        for geneNumber in range(len(self.__genotype)):
+            print(f"{geneNumber}: {self.__genotype[geneNumber]}")
 
     def printNumberedGenotype(self):
         """Utility function to just give an ordered list of all nodes."""
@@ -113,10 +193,42 @@ class CGPIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
 
         # Recalculate the active genes only if it has changed:
         if self.__activeGenes is None:
-            self.__activeGenes = self.getActiveGenes_generic(self.__genotype,
-                                                             self.outputSize)
+            self.__activeGenes = self.determineActiveGenes(self.__genotype, self.outputSize)
 
         return self.__activeGenes
+
+    def determineActiveGenes(self, genotype, outputSize):
+        """Determine which genes in the genotype are active."""
+
+        activeGenes = []
+        # Mark each output gene and its inputs as active:
+        for geneNumber in range(len(genotype) - 1,
+                                len(genotype) - outputSize - 1,
+                                -1):
+            self.setDependentGenesActive(genotype, geneNumber, activeGenes)
+
+        # Return the list
+        return activeGenes
+
+    def setDependentGenesActive(self, genotype, geneNumber, activeGenes):
+        """This recursive function will mark the provided gene number and all
+        genes upon which it depends as active."""
+
+        # No need to duplicate:
+        if geneNumber in activeGenes:
+            return
+
+        activeGenes.append(geneNumber)
+
+        # Input, Output, and processing genes treated differently:
+        if genotype[geneNumber]['Type'] == 'Input':
+            pass  # Already marked active, done.
+        elif genotype[geneNumber]['Type'] == 'Output':
+            # Mark its input as active:
+            self.setDependentGenesActive(genotype, genotype[geneNumber]['Input'], activeGenes)
+        else:  # Processing gene, mark both of its inputs as active:
+            self.setDependentGenesActive(genotype, genotype[geneNumber]['X'], activeGenes)
+            self.setDependentGenesActive(genotype, genotype[geneNumber]['Y'], activeGenes)
 
     def getActiveFunctionList(self):
         """This function will return a dictionary of every function and how
@@ -126,11 +238,11 @@ class CGPIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
         retDict = {}
 
         for geneNum in self.__activeGenes:
-            if len(self.__genotype[geneNum]) == 4:
-                if self.__genotype[geneNum][0] in retDict:
-                    retDict[self.__genotype[geneNum][0]] += 1
+            if self.__genotype[geneNum]['Type'] == 'Processing':
+                if self.__genotype[geneNum]['Function'] in retDict:
+                    retDict[self.__genotype[geneNum]['Function']] += 1
                 else:
-                    retDict[self.__genotype[geneNum][0]] = 1
+                    retDict[self.__genotype[geneNum]['Function']] = 1
 
         return retDict
 
@@ -202,18 +314,24 @@ class CGPIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
             genesToRemove = []
             for geneNum in activeGenes:
                 # Get the gene's inputs:
-                X = self.__geneOutputs[self.__genotype[geneNum][1]]
-                Y = self.__geneOutputs[self.__genotype[geneNum][2]]
+                X = self.__geneOutputs[self.__genotype[geneNum]['X']]
+                Y = self.__geneOutputs[self.__genotype[geneNum]['Y']]
+                P = self.__genotype[geneNum]['P']
 
                 # Check if we can calculate our output:
                 if X is not None and Y is not None:
                     # Calculate the value and set it into our outputs:
-                    self.__geneOutputs[geneNum] = \
-                        self.constrain(
-                           self.__genotype[geneNum][3] * \
-                           (self.functionList[self.__genotype[geneNum][0]](
-                           X, Y, self.__genotype[geneNum][3]))
-                        )
+                    output = self.functionList[self.__genotype[geneNum]['Function']](X, Y, P)
+
+                    # If we apply scale separately, do it here.  Otherwise we
+                    # scale with P:
+                    if self.useSeparateScaleValues:
+                        output *= self.__genotype[geneNum]['Scale']
+                    else:
+                        output *= P
+
+                    # Constrain the output and set it to our gene output:
+                    self.__geneOutputs[geneNum] = self.constrain(output)
 
                     # Mark progress made:
                     progressMade = True
@@ -227,27 +345,33 @@ class CGPIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
         # uncalculatable inputs. Moving from left to right, some values may
         # cascade as one gene's output provides another's input:
         for geneNum in activeGenes:
-            X = self.__geneOutputs[self.__genotype[geneNum][1]]
-            Y = self.__geneOutputs[self.__genotype[geneNum][2]]
+            X = self.__geneOutputs[self.__genotype[geneNum]['X']]
+            Y = self.__geneOutputs[self.__genotype[geneNum]['Y']]
 
             if X is None:
                 X = 0
             if Y is None:
                 Y = 0
 
-            self.__geneOutputs[geneNum] = \
-               self.constrain(
-                  self.__genotype[geneNum][3] * \
-                  (self.functionList[self.__genotype[geneNum][0]](
-                  X, Y, self.__genotype[geneNum][3]))
-               )
+            # Calculate the value and set it into our outputs:
+            output = self.functionList[self.__genotype[geneNum]['Function']](X, Y, P)
+
+            # If we apply scale separately, do it here.  Otherwise we
+            # scale with P:
+            if self.useSeparateScaleValues:
+                output *= self.__genotype[geneNum]['Scale']
+            else:
+                output *= P
+
+            # Constrain the output and set it to our gene output:
+            self.__geneOutputs[geneNum] = self.constrain(output)
 
         # Now, all gene outputs should be set, we can collect our output:
         outputs = []
         for geneNum in range(len(self.__genotype) - self.outputSize,
                              len(self.__genotype)):
             self.__geneOutputs[geneNum] = \
-               self.__geneOutputs[self.__genotype[geneNum][0]]
+               self.__geneOutputs[self.__genotype[geneNum]['Input']]
 
             outputs.append(self.__geneOutputs[geneNum])
             if outputs[len(outputs) - 1] is None:
@@ -267,6 +391,211 @@ class CGPIndividual(AbstractCGPIndividual.AbstractCGPIndividual):
           application=application)
         child.__activeGenes = None
         return child
+
+    def probabilisticMutate(self, genotype, functionList, pRange,
+                            maxColForward, maxColBack, genMutationRate=0.1,
+                            outMutationRate=0.1,
+                            totalInputCount=None, outputSize=None,
+                            rows=None, cols=None, application='pergene'):
+        """Mutate the provided genotype, given the provided parameters.
+        Individuals will almost definitely want to provide a replacement for
+        this function as a generic mutate will almost never work for new
+        individual types."""
+
+        if totalInputCount is None:
+            totalInputCount = self.totalInputCount
+
+        if outputSize is None:
+            outputSize = self.outputSize
+
+        if rows is None:
+            rows = self.rows
+
+        if cols is None:
+            cols = self.cols
+
+        processingGenesMutateOptions = 3
+        if self.useSeparateScaleValues:
+            processingGenesMutateOptions = 4
+
+        for i in range(totalInputCount, len(genotype)):
+            # Mutate outputs at a different rate than standard genes:
+            if genotype[i]['Type'] == 'Output':
+                if random.random() <= outMutationRate:
+                    startVal = genotype[i]['Input']
+                    while startVal == genotype[i]['Input']:
+                        newOut = self.getValidInputNodeNumber(
+                          i, maxColForward, maxColBack,
+                          totalInputCount=totalInputCount,
+                          outputSize=outputSize, rows=rows, cols=cols)
+                        genotype['Input'] = newOut
+
+            # Must be a generic node. Decide between applying the mutation rate
+            # per gene or per value inside the gene:
+            elif application.lower() == 'pergene':
+                # Check the mutation rate once for this gene, then is mutation
+                # is selected, choose one value in the gene to mutate:
+                if random.random() <= genMutationRate:
+                    valToMutate = random.randint(0, processingGenesMutateOptions)
+
+                    # Mutate the function:
+                    if valToMutate == 0:
+                        startVal = genotype[i]['Function']
+                        while startVal == genotype[i]['Function']:
+                            genotype[i]['Function'] = \
+                              random.randint(0, len(functionList) - 1)
+
+                    # Mutate the p-value:
+                    elif valToMutate == 3:
+                        genotype[i]['P'] = random.uniform(pRange[0], pRange[1])
+
+                    # Mutate the scale:
+                    elif valToMutate == 4:
+                        genotype[i]['Scale'] = random.uniform(self.scaleRange[0],
+                                                              self.scaleRange[1])
+
+                    # Otherwise, mutate one of the 2 inputs. Make sure it
+                    # changes and we don't use ourselves as an input:
+                    else:
+                        startVal = genotype[i]['X']
+                        if valToMutate == 2:
+                            startVal = genotype[i]['Y']
+
+                        newVal = startVal
+                        while startVal == newVal:
+                            newVal = self.getValidInputNodeNumber(
+                              i, maxColForward, maxColBack,
+                              totalInputCount=totalInputCount,
+                              outputSize=outputSize, rows=rows, cols=cols)
+                        if valToMutate == 1:
+                            genotype[i]['X'] = newVal
+                        else:
+                            genotype[i]['Y'] = newVal
+
+            elif application.lower() == 'pervalue':
+                # Check the mutation once for each value in the gene:
+                if random.random() <= genMutationRate:
+                    startVal = genotype[i]['Function']
+                    while startVal == genotype[i]['Function']:
+                        genotype[i]['Function'] = \
+                            random.randint(0, len(functionList) - 1)
+                # Mutate the first input:
+                if random.random() <= genMutationRate:
+                    startVal = genotype[i]['X']
+                    while startVal == genotype[i]['X']:
+                        genotype[i][1] = self.getValidInputNodeNumber(
+                          i, maxColForward, maxColBack,
+                          totalInputCount=totalInputCount,
+                          outputSize=outputSize, rows=rows, cols=cols)
+
+                # Mutate the second input:
+                if random.random() <= genMutationRate:
+                    startVal = genotype[i]['Y']
+                    while startVal == genotype[i]['Y']:
+                        genotype[i][2] = self.getValidInputNodeNumber(
+                          i, maxColForward, maxColBack,
+                          totalInputCount=totalInputCount,
+                          outputSize=outputSize, rows=rows, cols=cols)
+
+                # Mutate the parameter (P):
+                if random.random() <= genMutationRate:
+                    genotype[i]['P'] = random.uniform(pRange[0], pRange[1])
+
+                # Mutate the scale parameter:
+                if self.useSeparateScaleValues and \
+                   random.random() <= genMutationRate:
+                    genotype[i]['Scale'] = random.uniform(self.scaleRange[0],
+                                                          self.scaleRange[1])
+
+            else:
+                raise ValueError("Unknown mutation application strategy: %s" %
+                                 (application))
+
+    def activeGeneMutate(self, genotype, functionList, pRange, activeGenes,
+                         maxColForward, maxColBack, numGenesToMutate=1,
+                         totalInputCount=None, outputSize=None,
+                         rows=None, cols=None,):
+        """Mutate the individual using an active-gene mutation strategy.
+        Individuals will definitely want to provide a replacement for this
+        function as a generic mutation function will almost never work
+        properly for new individual types."""
+        if totalInputCount is None:
+            totalInputCount = self.totalInputCount
+
+        if outputSize is None:
+            outputSize = self.outputSize
+
+        if rows is None:
+            rows = self.rows
+
+        if cols is None:
+            cols = self.cols
+
+        processingGenesMutateOptions = 3
+        if self.useSeparateScaleValues:
+            processingGenesMutateOptions = 4
+
+        activeGenesMutated = 0
+        loopCount = 0
+        while activeGenesMutated < numGenesToMutate:
+            geneNum = random.randint(totalInputCount, len(genotype) - 1)
+
+            # If we selected an output gene, we only have one thing to change:
+            if genotype[geneNum]['Type'] == 'Output':
+                startVal = genotype[geneNum]['Input']
+                while startVal == genotype[geneNum]['Input']:
+                    genotype[geneNum]['Input'] = self.getValidInputNodeNumber(
+                      geneNum, maxColForward, maxColBack,
+                      totalInputCount=totalInputCount, outputSize=outputSize,
+                      rows=rows, cols=cols)
+
+            else:  # Standard gene
+                # Pick one of its characteristics:
+                characteristic = random.randint(0, processingGenesMutateOptions)
+
+                # Pick a new function:
+                if characteristic == 0:
+                    startVal = genotype[geneNum]['Function']
+                    while startVal == genotype[geneNum]['Function']:
+                        genotype[geneNum]['Function'] = random.randint(
+                          0, len(functionList) - 1)
+
+                # Pick a new parameter:
+                elif characteristic == 3:
+                    genotype[geneNum]['P'] = random.uniform(pRange[0], pRange[1])
+
+                # New scale factor:
+                elif characteristic == 4:
+                    genotype[geneNum]['Scale'] = random.uniform(self.scaleRange[0], self.scaleRange[1])
+
+                # Pick a new X:
+                elif characteristic == 1:
+                    startVal = genotype[geneNum]['X']
+                    while startVal == genotype[geneNum]['X']:
+                        genotype[geneNum]['X'] = \
+                          self.getValidInputNodeNumber(
+                            geneNum, maxColForward, maxColBack,
+                            totalInputCount=totalInputCount,
+                            outputSize=outputSize,
+                            rows=rows, cols=cols)
+
+                else:  # 2, pick a new Y
+                    startVal = genotype[geneNum]['Y']
+                    while startVal == genotype[geneNum]['Y']:
+                        genotype[geneNum]['Y'] = \
+                          self.getValidInputNodeNumber(
+                            geneNum, maxColForward, maxColBack,
+                            totalInputCount=totalInputCount,
+                            outputSize=outputSize,
+                            rows=rows, cols=cols)
+
+            if geneNum in activeGenes:
+                activeGenesMutated += 1
+                loopCount = 0
+
+            loopCount += 1
+            if loopCount > 100000:
+                raise ValueError("Infinite loop.")
 
     def __getActiveGeneMutatedChild(self, numGenesToMutate=1):
         child = copy.deepcopy(self)

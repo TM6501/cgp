@@ -9,7 +9,7 @@ import copy
 import numbers
 import random
 
-# Binary (boolean) inputs / outputs
+# Binary (boolean) inputs / outputs.
 def And(X, Y, P):
     return int(X and Y)
 
@@ -27,6 +27,40 @@ def Xor(X, Y, P):
 
 def AndNotY(X, Y, P):
     return X and not Y
+
+# Floating point logical-equivalents. They will consider > 0 as "True" and
+# <= 0 as "False". They will return 1.0 for "True" and -1.0 for "False"
+def float_And(X, Y, P):
+    if X > 0.0 and Y > 0.0:
+        return 1.0
+    else:
+        return -1.0
+
+def float_Or(X, Y, P):
+    if X > 0.0 or Y > 0.0:
+        return 1.0
+    else:
+        return -1.0
+
+def float_Nand(X, Y, P):
+    return -float_And(X, Y, P)
+
+def float_Nor(X, Y, P):
+    return -float_Or(X, Y, P)
+
+def float_Xor(X, Y, P):
+    # X or Y, not both:
+    if (X > 0.0 and Y <= 0.0) or (X <= 0.0 and Y > 0.0):
+        return 1.0
+    else:
+        return -1.0
+
+def float_AndNotY(X, Y, P):
+    if X > 0.0 and Y <= 0.0:
+        return 1.0
+    else:
+        return -1.0
+
 
 # Functions used by neurons in neural networks. They take a single input, which
 # is usually the sum of their inputs, each multiplied by a weight:
@@ -193,6 +227,12 @@ def do_AMINUS(X, Y, P):
 
 def AMINUS(X, Y, P):
     return callRealFunc(X, Y, P, [(None, None, do_AMINUS)])
+
+def do_CMINUS(X, Y, P):
+    return X - P
+
+def CMINUS(X, Y, P):
+    return callRealFunc(X, Y, P, [(None, None, do_CMINUS)])
 
 def MULT_ATARI_float(X, Y, P):
     return X * Y
@@ -459,6 +499,22 @@ def LT(X, Y, P):
                                   (numbers.Number, numbers.Number, LT_float),
                                   (numbers.Number, np.ndarray, LT_matrix_float)])
 
+def LTE_matrix_matrix(X, Y, P):
+    X1, Y1 = getMatricesMinimumDimensions(X, Y)
+    return (X1 <= Y1).astype(float)
+
+def LTE_matrix_float(X, Y, P):
+    return (X <= Y).astype(float)
+
+def LTE_float(X, Y, P):
+    return float(X <= Y)
+
+def LTE(X, Y, P):
+    return callRealFunc(X, Y, P, [(np.ndarray, np.ndarray, LTE_matrix_matrix),
+                                  (np.ndarray, numbers.Number, LTE_matrix_float),
+                                  (numbers.Number, numbers.Number, LTE_float),
+                                  (numbers.Number, np.ndarray, LTE_matrix_float)])
+
 def GT_matrix_matrix(X, Y, P):
     X1, Y1 = getMatricesMinimumDimensions(X, Y)
     return (X1 > Y1).astype(float)
@@ -474,6 +530,28 @@ def GT(X, Y, P):
                                   (np.ndarray, numbers.Number, GT_matrix_float),
                                   (numbers.Number, numbers.Number, GT_float),
                                   (numbers.Number, np.ndarray, GT_matrix_float)])
+
+def GTE_matrix_matrix(X, Y, P):
+    X1, Y1 = getMatricesMinimumDimensions(X, Y)
+    return (X1 >= Y1).astype(float)
+
+def GTE_matrix_float(X, Y, P):
+    return (X >= Y).astype(float)
+
+def GTE_float(X, Y, P):
+    return float(X >= Y)
+
+def GTE(X, Y, P):
+    return callRealFunc(X, Y, P, [(np.ndarray, np.ndarray, GTE_matrix_matrix),
+                                  (np.ndarray, numbers.Number, GTE_matrix_float),
+                                  (numbers.Number, numbers.Number, GTE_float),
+                                  (numbers.Number, np.ndarray, GTE_matrix_float)])
+
+def GTEP(X, Y, P):
+    return float(X >= P)
+
+def LTEP(X, Y, P):
+    return float(X <= P)
 
 def MAX2_matrix_matrix(X, Y, P):
     X1, Y1 = getMatricesMinimumDimensions(X, Y)

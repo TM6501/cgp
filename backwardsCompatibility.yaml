@@ -1,0 +1,11 @@
+# Backwards compatibility may require you to define any or all of these in
+# your YAML file if they don't already exist.
+parameters:
+  ENV_initial-target_altitude:
+    value: 1500
+  ENV_initial-target_heading:
+    value: 270
+  ENV_initial-target_airspeed:
+    value: 100
+  ENV_initial-seconds_until_goal_change:
+    value: -1

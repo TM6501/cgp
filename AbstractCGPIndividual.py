@@ -22,7 +22,7 @@ class AbstractCGPIndividual(object, metaclass=abc.ABCMeta):
         shape=None,
         constraintRange=None,
         functionList=None):
-            """Every individual must provide a constructor."""
+            #  Every individual must provide a constructor.
             raise NotImplementedError("%s must be defined." %
                                       (sys._getframe().f_code.co_name))
 
@@ -253,11 +253,15 @@ class AbstractCGPIndividual(object, metaclass=abc.ABCMeta):
             cols = self.cols
 
         for i in range(totalInputCount, len(genotype)):
+            print(f"{i} / {len(genotype)}")
+            sys.stdout.flush()
             # Mutate outputs at a different rate than standard genes:
             if len(genotype[i]) == 1:
                 if random.random() <= outMutationRate:
                     startVal = genotype[i]
-                    while startVal == genotype[i]:
+                    attemptNumber = 0  # Rare case where there are no other choices
+                    while startVal == genotype[i] and attemptNumber < 10:
+                        attemptNumber += 1
                         newOut = self.getValidInputNodeNumber(
                           i, maxColForward, maxColBack,
                           totalInputCount=totalInputCount,
@@ -269,15 +273,22 @@ class AbstractCGPIndividual(object, metaclass=abc.ABCMeta):
             elif application.lower() == 'pergene':
                 # Check the mutation rate once for this gene, then is mutation
                 # is selected, choose one value in the gene to mutate:
+                sys.stdout.flush()
                 if random.random() <= genMutationRate:
                     valToMutate = random.randint(0, 3)
 
+                    # Only one function, can't mutate it:
+                    if len(functionList) < 2:
+                        valToMutate = random.randint(1, 3)
+
                     # Mutate the function:
                     if valToMutate == 0:
+                        sys.stdout.flush()
                         startVal = genotype[i][0]
                         while startVal == genotype[i][0]:
                             genotype[i][0] = \
                               random.randint(0, len(functionList) - 1)
+
                     # Mutate the p-value:
                     elif valToMutate == 3:
                         genotype[i][3] = random.uniform(pRange[0], pRange[1])
@@ -286,7 +297,9 @@ class AbstractCGPIndividual(object, metaclass=abc.ABCMeta):
                     # changes and we don't use ourselves as an input:
                     else:
                         startVal = genotype[i][valToMutate]
-                        while startVal == genotype[i][valToMutate]:
+                        attemptNumber = 0  # Rare case where there are no other choices
+                        while startVal == genotype[i][valToMutate] and attemptNumber < 10:
+                            attemptNumber += 1
                             newVal = self.getValidInputNodeNumber(
                               i, maxColForward, maxColBack,
                               totalInputCount=totalInputCount,
@@ -295,7 +308,7 @@ class AbstractCGPIndividual(object, metaclass=abc.ABCMeta):
 
             elif application.lower() == 'pervalue':
                 # Check the mutation once for each value in the gene:
-                if random.random() <= genMutationRate:
+                if random.random() <= genMutationRate and len(functionList) > 1:
                     startVal = genotype[i][0]
                     while startVal == genotype[i][0]:
                         genotype[i][0] = \
@@ -303,7 +316,9 @@ class AbstractCGPIndividual(object, metaclass=abc.ABCMeta):
                 # Mutate the first input:
                 if random.random() <= genMutationRate:
                     startVal = genotype[i][1]
-                    while startVal == genotype[i][1]:
+                    attemptNumber = 0  # Rare case where there are no other choices
+                    while startVal == genotype[i][1] and attemptNumber < 10:
+                        attemptNumber += 1
                         genotype[i][1] = self.getValidInputNodeNumber(
                           i, maxColForward, maxColBack,
                           totalInputCount=totalInputCount,
@@ -312,7 +327,9 @@ class AbstractCGPIndividual(object, metaclass=abc.ABCMeta):
                 # Mutate the second input:
                 if random.random() <= genMutationRate:
                     startVal = genotype[i][2]
-                    while startVal == genotype[i][2]:
+                    attemptNumber = 0  # Rare case where there are no other choices
+                    while startVal == genotype[i][2] and attemptNumber < 10:
+                        attemptNumber += 1
                         genotype[i][2] = self.getValidInputNodeNumber(
                           i, maxColForward, maxColBack,
                           totalInputCount=totalInputCount,
